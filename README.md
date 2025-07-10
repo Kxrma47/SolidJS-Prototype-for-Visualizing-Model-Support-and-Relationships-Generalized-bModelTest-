@@ -132,6 +132,11 @@ The component accepts data in this format:
   * Improved tooltip and zoom behavior
 
 ---
+## Screenshots
+![Screenshot 2025-07-10 at 9 45 58 AM](https://github.com/user-attachments/assets/1b254175-98d5-4f0c-9d2a-a22feac81332)
+![Screenshot 2025-07-10 at 9 46 08 AM](https://github.com/user-attachments/assets/27d3bf30-bd1d-480b-ae98-327404b458b9)
+![Screenshot 2025-07-10 at 9 46 43 AM](https://github.com/user-attachments/assets/2885de35-8269-4503-b83b-152b70ad3c3e)
+
 
 ## Technical Stack
 
