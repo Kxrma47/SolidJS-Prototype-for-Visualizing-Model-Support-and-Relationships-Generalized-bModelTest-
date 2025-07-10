@@ -47,17 +47,21 @@ export default function App() {
 
 📁 Project Structure
 
+bash
+
 src/
-├── App.tsx              # Main entry point
-├── ModelGraph.tsx       # Visualization component
+├── App.tsx              # Main entry point, handles theme and layout
+├── ModelGraph.tsx       # Core visualization component using D3
 ├── data/
-│   └── exampleModels.ts # Mock dataset (models + links)
+│   └── exampleModels.ts # Mock dataset defining models and links
 ├── assets/
-│   └── solid.svg        # Logo
-├── index.css            # Theme + layout styling
-├── App.css              # Title bar / demo styles
-├── index.tsx            # App bootstrapping
-└── vite-env.d.ts
+│   └── solid.svg        # App logo
+├── index.css            # Global theme and layout styling
+├── App.css              # Page-level and component-specific styles
+├── index.tsx            # App bootstrapping for SolidJS
+└── vite-env.d.ts        # Type definitions for Vite environment
+
+
 
 
 ⸻
