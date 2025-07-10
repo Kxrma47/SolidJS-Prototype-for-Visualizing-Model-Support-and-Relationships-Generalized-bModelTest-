@@ -2,28 +2,96 @@
 import * as d3 from "https://cdn.skypack.dev/d3";
 import { createSignal, onMount, Show } from "solid-js";
 
+interface Model {
+  id: string;
+  label: string;
+  support: number;
+  inHPD?: boolean | null;
+}
+
+interface Link {
+  source: string;
+  target: string;
+}
+
+type NodeDatum = Model & {
+  r: number;
+  labelRadius: number;
+  generality: number;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+};
+
+type SimLink = Link & d3.SimulationLinkDatum<NodeDatum>;
+
 export default function ModelGraph(props: {
-  data: { models: any[]; links: any[] };
+  data: { models: Model[]; links: Link[] };
   width?: number;
   height?: number;
   aspect?: number;
   showSidebar?: boolean;
+  colors?: {
+    inHPD?: string;
+    notInHPD?: string;
+    unknown?: string;
+    arrow?: string;
+    stroke?: string;
+    focusSource?: string;
+    focusTarget?: string;
+  };
 }) {
   let svgRef: SVGSVGElement | undefined;
-  const [selectedModel, setSelectedModel] = createSignal<any>(null);
+  const [selectedModel, setSelectedModel] = createSignal<NodeDatum | null>(null);
 
-  const aspect           = props.aspect ?? 2;                 // width : height ratio
-  const W                = props.width  ?? 800;
-  const H                = props.height ?? W / aspect;
-  const showPanel        = props.showSidebar !== false;
-  const g                = (id: string) => new Set(id).size;
+  const aspect = props.aspect ?? 2;
+  const W = props.width ?? 800;
+  const H = props.height ?? W / aspect;
+  const color = {
+    inHPD: props.colors?.inHPD ?? "#0074D9",       // Blue
+    notInHPD: props.colors?.notInHPD ?? "#FF4136", // Red
+    unknown: props.colors?.unknown ?? "#CCCCCC",   // Gray
+    arrow: props.colors?.arrow ?? "#333",          // Arrowhead
+    stroke: props.colors?.stroke ?? "#999",        // Line
+    focusSource: props.colors?.focusSource ?? "#ff4444", // Red focus
+    focusTarget: props.colors?.focusTarget ?? "#4444ff"  // Blue focus
+  };
+
+  const g = (id: string) => new Set(id).size;
 
   onMount(() => {
-    const svg        = d3.select(svgRef).attr("width", W).attr("height", H).style("background", "#fff");
-    svg.selectAll("*").remove();
-    const container  = svg.append("g");
+    const svg = d3
+      .select(svgRef)
+      .attr("width", W)
+      .attr("height", H)
+      .style("background", "#fff");
 
-    const tooltip = d3.select("body").append("div")
+    svg.selectAll("*").remove();
+    renderGraph(svg);
+  });
+
+  function renderGraph(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) {
+    svg
+      .append("defs")
+      .append("marker")
+      .attr("id", "arrow")
+      .attr("viewBox", "0 0 10 10")
+      .attr("refX", 10)
+      .attr("refY", 5)
+      .attr("markerWidth", 8)
+      .attr("markerHeight", 8)
+      .attr("orient", "auto")
+      .attr("markerUnits", "userSpaceOnUse")
+      .append("path")
+      .attr("d", "M0,0 L10,5 L0,10 Z")
+      .attr("fill", color.arrow);
+
+    const container = svg.append("g");
+
+    const tooltip = d3
+      .select("body")
+      .append("div")
       .style("position", "absolute")
       .style("visibility", "hidden")
       .style("padding", "6px 8px")
@@ -34,47 +102,72 @@ export default function ModelGraph(props: {
       .style("pointer-events", "none")
       .style("z-index", "1000");
 
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 3])
       .filter(e => !e.button)
       .on("zoom", e => container.attr("transform", e.transform));
 
     svg.call(zoom);
 
-    const nodes = props.data.models.map(d => {
-      const r = 30 * d.support;
-      const labelW = (d.label.length + 6) * 5;
+    const nodes: NodeDatum[] = props.data.models.map(m => {
+      const r = Math.max(200 * m.support, 4);
+      const labelW = (m.label.length + 6) * 5;
       return {
-        ...d,
+        ...m,
         r,
         labelRadius: Math.max(r, labelW / 2),
-        generality: g(d.id),
-        y: H * (0.1 + 0.8 * (g(d.id) - 1) / 5),
+        generality: g(m.id),
+        y: H * (0.1 + 0.8 * (g(m.id) - 1) / 5),
       };
     });
 
-    const links = props.data.links.map(d => ({ ...d }));
+    const links: SimLink[] = props.data.links.map(l => ({ ...l }));
 
-    const sim = d3.forceSimulation(nodes as any)
-      .force("link", d3.forceLink(links as any).id((d: any) => d.id).distance(120))
-      .force("charge", d3.forceManyBody().strength(-250))
-      .force("collision", d3.forceCollide().radius((d: any) => d.labelRadius + 20))
-      .force("x", d3.forceX().strength(0.25).x((d: any) =>
-        d.id.startsWith("121") ? W / 3 : d.id.startsWith("123") ? (2 * W) / 3 : W / 2))
-      .force("y", d3.forceY().strength(1).y((d: any) => H * (0.1 + 0.8 * (d.generality - 1) / 5)));
+    const sim = d3
+      .forceSimulation<NodeDatum>(nodes)
+      .force(
+        "link",
+        d3
+          .forceLink<NodeDatum, SimLink>(links)
+          .id(d => d.id)
+          .distance(120),
+      )
+      .force("charge", d3.forceManyBody<NodeDatum>().strength(-250))
+      .force("collision", d3.forceCollide<NodeDatum>().radius(d => d.labelRadius + 20))
+      .force("x", d3.forceX<NodeDatum>().strength(0.25).x(d => (d.id.startsWith("121") ? W / 3 : d.id.startsWith("123") ? (2 * W) / 3 : W / 2)))
+      .force("y", d3.forceY<NodeDatum>().strength(1).y(d => H * (0.1 + 0.8 * (d.generality - 1) / 5)));
 
-    const link = container.append("g").selectAll("line")
-      .data(links).enter().append("line")
-      .attr("stroke", "#999").attr("stroke-opacity", 0.6).attr("stroke-width", 1.5);
+    const link = container
+      .append("g")
+      .selectAll<SVGLineElement, SimLink>("line")
+      .data(links)
+      .enter()
+      .append("line")
+      .attr("stroke", color.stroke)
+      .attr("stroke-opacity", 0.6)
+      .attr("stroke-width", d =>
+        (d.source as NodeDatum).id === selectedModel()?.id || (d.target as NodeDatum).id === selectedModel()?.id
+          ? 3.5
+          : 2.5
+      )
+      .attr("marker-end", () => `url(#arrow)`);
 
-    const node = container.append("g").selectAll("circle")
-      .data(nodes).enter().append("circle")
-      .attr("r", (d: any) => d.r)
-      .attr("fill", (d: any) => d.support > 0.1 ? "#ff6600" : d.support > 0.05 ? "#ffaa00" : "#cccccc")
+    const node = container
+      .append("g")
+      .selectAll<SVGCircleElement, NodeDatum>("circle")
+      .data(nodes)
+      .enter()
+      .append("circle")
+      .attr("r", d => d.r)
+      .attr("fill", d =>
+        d.inHPD === true ? color.inHPD : d.inHPD === false ? color.notInHPD : color.unknown
+      )
       .style("cursor", "pointer")
-      .on("mouseenter", (e, d: any) => {
-        tooltip.html(`${d.label}<br/>Support ${(d.support * 100).toFixed(1)} %`)
-               .style("visibility", "visible");
+      .on("mouseenter", (_e, d) => {
+        tooltip
+          .html(`${d.label}<br/>Support ${(d.support * 100).toFixed(1)} %`)
+          .style("visibility", "visible");
         spotlight(d);
       })
       .on("mousemove", e => tooltip.style("left", `${e.clientX + 12}px`).style("top", `${e.clientY + 12}px`))
@@ -82,61 +175,180 @@ export default function ModelGraph(props: {
         tooltip.style("visibility", "hidden");
         if (!selectedModel()) clearHighlight();
       })
-      .on("click", (_, d: any) => {
+      .on("click", (_e, d) => {
         const repeat = selectedModel()?.id === d.id;
-        repeat ? resetView() : focusOn(d);
+        repeat ? resetView(svg, zoom) : focusOn(d, svg, zoom);
       })
       .call(
-        d3.drag<SVGCircleElement, any>()
-          .on("start", (e, d: any) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-          .on("drag", (e, d: any) => { d.fx = e.x; d.fy = e.y; })
-          .on("end",  (e, d: any) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+        d3
+          .drag<SVGCircleElement, NodeDatum>()
+          .on("start", (e, d) => {
+            if (!e.active) sim.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          })
+          .on("drag", (e, d) => {
+            d.fx = e.x;
+            d.fy = e.y;
+          })
+          .on("end", (e, d) => {
+            if (!e.active) sim.alphaTarget(0);
+            // Lock position
+            d.fx = d.x;
+            d.fy = d.y;
+          }),
       );
 
-    const label = container.append("g").selectAll("text")
-      .data(nodes).enter().append("text")
-      .text((d: any) => `${d.label} (${(d.support * 100).toFixed(1)} %)`)
+    const label = container
+      .append("g")
+      .selectAll<SVGTextElement, NodeDatum>("text")
+      .data(nodes)
+      .enter()
+      .append("text")
+      .text(d => `${d.label} (${(d.support * 100).toFixed(1)} %)`)
       .attr("text-anchor", "middle")
       .style("pointer-events", "none")
       .style("font", "12px sans-serif")
       .style("fill", "#333");
 
-    const legendData = [
-      { txt: "High > 10 %", col: "#ff6600" },
-      { txt: "Medium 5–10 %", col: "#ffaa00" },
-      { txt: "Low < 5 %", col: "#cccccc" }
-    ];
+const legendData = [
+  { txt: "In HPD", col: color.inHPD },
+  { txt: "Not in HPD", col: color.notInHPD },
+  { txt: "Unknown", col: color.unknown },
+];
 
     const legend = svg.append("g").attr("transform", "translate(16,16)");
-    legend.selectAll("rect").data(legendData).enter()
-      .append("rect").attr("x", 0).attr("y", (_, i) => i * 20)
-      .attr("width", 12).attr("height", 12).attr("fill", d => d.col);
-    legend.selectAll("text").data(legendData).enter()
-      .append("text").text(d => d.txt)
-      .attr("x", 18).attr("y", (_, i) => i * 20 + 10)
-      .attr("font-size", "12px").attr("fill", "#333")
+    legend
+      .selectAll("rect")
+      .data(legendData)
+      .enter()
+      .append("rect")
+      .attr("x", 0)
+      .attr("y", (_, i) => i * 20)
+      .attr("width", 12)
+      .attr("height", 12)
+      .attr("fill", d => d.col);
+    legend
+      .selectAll("text")
+      .data(legendData)
+      .enter()
+      .append("text")
+      .text(d => d.txt)
+      .attr("x", 18)
+      .attr("y", (_, i) => i * 20 + 10)
+      .attr("font-size", "12px")
+      .attr("fill", "#333")
       .attr("alignment-baseline", "middle");
 
-    function spotlight(d: any) {
-      const nbs = links.filter((l: any) => l.source.id === d.id || l.target.id === d.id)
-                       .flatMap((l: any) => [l.source.id, l.target.id]);
-      d3.selectAll("circle")
-        .style("opacity", (n: any) => (n.id === d.id || nbs.includes(n.id) ? 1 : 0.15))
-        .attr("r", (n: any) => (n.id === d.id ? n.r + 6 : n.r));
-      d3.selectAll("line")
-        .style("opacity", (l: any) => (l.source.id === d.id || l.target.id === d.id ? 1 : 0.05))
-        .attr("stroke", (l: any) => (l.source.id === d.id || l.target.id === d.id ? "#4444ff" : "#999"));
+    svg.on("dblclick", () => resetView(svg, zoom));
+
+    sim.on("tick", () => {
+      link
+        .attr("x1", d => {
+          const s = d.source as NodeDatum;
+          const t = d.target as NodeDatum;
+          const dx = t.x! - s.x!;
+          const dy = t.y! - s.y!;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          return s.x! + (dx * s.r) / dist;
+        })
+        .attr("y1", d => {
+          const s = d.source as NodeDatum;
+          const t = d.target as NodeDatum;
+          const dx = t.x! - s.x!;
+          const dy = t.y! - s.y!;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          return s.y! + (dy * s.r) / dist;
+        })
+        .attr("x2", d => {
+          const s = d.source as NodeDatum;
+          const t = d.target as NodeDatum;
+          const dx = t.x! - s.x!;
+          const dy = t.y! - s.y!;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          return t.x! - (dx * (t.r + 4)) / dist;
+        })
+        .attr("y2", d => {
+          const s = d.source as NodeDatum;
+          const t = d.target as NodeDatum;
+          const dx = t.x! - s.x!;
+          const dy = t.y! - s.y!;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          return t.y! - (dy * (t.r + 4)) / dist;
+        });
+
+      node.attr("cx", d => d.x!).attr("cy", d => d.y!);
+
+      label
+        .attr("x", d => {
+          const related = links.filter(l => l.source === d || l.target === d);
+          const avg = related.reduce(
+            (acc, l) => {
+              const other = l.source === d ? (l.target as NodeDatum) : (l.source as NodeDatum);
+              acc.dx += d.x! - other.x!;
+              acc.dy += d.y! - other.y!;
+              return acc;
+            },
+            { dx: 0, dy: 0 },
+          );
+          const count = related.length || 1;
+          const dx = avg.dx / count;
+          const dy = avg.dy / count;
+          const norm = Math.sqrt(dx * dx + dy * dy) || 1;
+          const offset = d.r + 18;
+          return d.x! + (dx / norm) * offset;
+        })
+        .attr("y", d => {
+          const related = links.filter(l => l.source === d || l.target === d);
+          const avg = related.reduce(
+            (acc, l) => {
+              const other = l.source === d ? (l.target as NodeDatum) : (l.source as NodeDatum);
+              acc.dx += d.x! - other.x!;
+              acc.dy += d.y! - other.y!;
+              return acc;
+            },
+            { dx: 0, dy: 0 },
+          );
+          const count = related.length || 1;
+          const dx = avg.dx / count;
+          const dy = avg.dy / count;
+          const norm = Math.sqrt(dx * dx + dy * dy) || 1;
+          const offset = d.r + 18;
+          return d.y! + (dy / norm) * offset;
+        })
+        .style("font-size", () => `${Math.min(12 / d3.zoomTransform(svg.node()!).k, 14)}px`);
+    });
+
+    function spotlight(target: NodeDatum) {
+      const neighborIds = new Set(
+        links
+          .filter(l => l.source === target || l.target === target)
+          .flatMap(l => [(l.source as NodeDatum).id, (l.target as NodeDatum).id]),
+      );
+
+      node.style("opacity", n => (n.id === target.id || neighborIds.has(n.id) ? 1 : 0.5));
+      label.style("opacity", n => (n.id === target.id || neighborIds.has(n.id) ? 1 : 0.5));
+      link
+        .style("opacity", l => ((l.source as NodeDatum).id === target.id || (l.target as NodeDatum).id === target.id ? 1 : 0.2))
+        .attr("stroke", l =>
+          (l.source as NodeDatum).id === target.id
+            ? color.focusSource
+            : (l.target as NodeDatum).id === target.id
+            ? color.focusTarget
+            : color.stroke
+        )
     }
 
     function clearHighlight() {
-      d3.selectAll("circle").style("opacity", 1).attr("r", (d: any) => d.r);
-      d3.selectAll("line").style("opacity", 0.6).attr("stroke", "#999");
+      node.style("opacity", 1);
+      label.style("opacity", 1);
+      link.style("opacity", 0.6).attr("stroke", color.stroke);
     }
 
-    function fit(nodesFit: any[]) {
+    function fit(nodesFit: NodeDatum[]) {
       const pad = 60;
-      const xE = d3.extent(nodesFit, (n: any) => n.x);
-      const yE = d3.extent(nodesFit, (n: any) => n.y);
+      const xE = d3.extent(nodesFit, n => n.x);
+      const yE = d3.extent(nodesFit, n => n.y);
       const dx = (xE[1] ?? 0) - (xE[0] ?? 0) + pad;
       const dy = (yE[1] ?? 0) - (yE[0] ?? 0) + pad;
       const scale = Math.min(2.5, 0.85 / Math.max(dx / W, dy / H));
@@ -145,86 +357,84 @@ export default function ModelGraph(props: {
       return { scale, tx, ty };
     }
 
-    function focusOn(d: any) {
-      const neigh = links.filter((l: any) => l.source.id === d.id || l.target.id === d.id)
-                         .map((l: any) => (l.source.id === d.id ? l.target.id : l.source.id));
+    function focusOn(d: NodeDatum, svgSel: any, zoomSel: any) {
+      const neigh = links
+        .filter(l => l.source === d || l.target === d)
+        .map(l => ((l.source === d ? l.target : l.source) as NodeDatum).id);
+
       setSelectedModel({ ...d, neighbors: neigh });
 
-      const { scale, tx, ty } = fit(nodes.filter((n: any) => n.id === d.id || neigh.includes(n.id)));
+      const { scale, tx, ty } = fit(nodes.filter(n => n.id === d.id || neigh.includes(n.id)));
 
-      svg.transition().duration(1200).ease(d3.easeCubicInOut)
-         .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
-
-      d3.selectAll("circle").attr("stroke", null).attr("stroke-width", null);
-      d3.selectAll("circle")
-        .style("opacity", (n: any) => (n.id === d.id || neigh.includes(n.id) ? 1 : 0.1))
-        .attr("stroke", (n: any) => (n.id === d.id ? "#fff" : null))
-        .attr("stroke-width", (n: any) => (n.id === d.id ? 3 : null));
-
-      d3.selectAll("line")
-        .style("opacity", (l: any) => (l.source.id === d.id || l.target.id === d.id ? 1 : 0.05))
-        .attr("stroke", (l: any) => (l.source.id === d.id ? "#ff4444" : l.target.id === d.id ? "#4444ff" : "#999"));
+      svgSel
+        .transition()
+        .duration(1200)
+        .ease(d3.easeCubicInOut)
+        .call(zoomSel.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
     }
 
-    function resetView() {
+    function resetView(svgSel: any, zoomSel: any) {
       setSelectedModel(null);
       clearHighlight();
-      d3.selectAll("circle").attr("stroke", null).attr("stroke-width", null);
-      svg.transition().duration(1200).ease(d3.easeCubicInOut)
-         .call(zoom.transform, d3.zoomIdentity);
+      svgSel
+        .transition()
+        .duration(1200)
+        .ease(d3.easeCubicInOut)
+        .call(zoomSel.transform, d3.zoomIdentity);
     }
+  }
 
-    svg.on("dblclick", resetView);
-
-    sim.on("tick", () => {
-      link.attr("x1", (d: any) => d.source.x).attr("y1", (d: any) => d.source.y)
-          .attr("x2", (d: any) => d.target.x).attr("y2", (d: any) => d.target.y);
-      node.attr("cx", (d: any) => d.x).attr("cy", (d: any) => d.y);
-      label.attr("x", (d: any) => d.x).attr("y", (d: any) => d.y - d.r - 6)
-           .style("font-size", () => `${Math.min(12 / d3.zoomTransform(svg.node()!).k, 14)}px`);
-    });
-  });
-
-return (
-  <div
-    style={{
-      display: "flex",
-      gap: "24px",
-      alignItems: "stretch",
-      height: props.height ? `${H}px` : "100%",
-      backgroundColor: "var(--graph-bg)",
-      borderRadius: "var(--border-radius)",
-      padding: "16px",
-      boxSizing: "border-box",
-      overflow: "hidden",
-    }}
-  >
-    <svg
-      ref={svgRef}
-      style={{
-        flex: 1,
-        width: props.width ? `${W}px` : "100%",
-        height: props.height ? `${H}px` : "100%",
-        borderRadius: "var(--border-radius)",
-      }}
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMidYMid meet"
-    />
+  return (
     <div
-      class={`sidebar-panel ${selectedModel() ? "show" : ""}`}
+      style={{
+        display: "flex",
+        gap: "24px",
+        alignItems: "stretch",
+        height: props.height ? `${H}px` : "100%",
+        backgroundColor: "var(--graph-bg)",
+        borderRadius: "var(--border-radius)",
+        padding: "16px",
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
     >
-      <Show when={selectedModel()}>
-        <div>
-          <h3 style={{ marginTop: 0 }}>{selectedModel().label}</h3>
-          <p><strong>Support:</strong> {(selectedModel().support * 100).toFixed(2)} %</p>
-          <p><strong>In HPD:</strong> {selectedModel().inHPD ? "Yes" : "No"}</p>
-          <p><strong>Connected Models:</strong></p>
-          <ul style={{ paddingLeft: "1.2rem", margin: 0 }}>
-            {selectedModel().neighbors.map((id: string) => <li>{id}</li>)}
-          </ul>
-        </div>
-      </Show>
+      <svg
+        ref={svgRef}
+        style={{
+          flex: 1,
+          width: props.width ? `${W}px` : "100%",
+          height: props.height ? `${H}px` : "100%",
+          borderRadius: "var(--border-radius)",
+        }}
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="xMidYMid meet"
+      />
+      <div class={`sidebar-panel ${selectedModel() ? "show" : ""}`}>
+        <Show when={selectedModel()}>
+          <div>
+            <h3 style={{ marginTop: 0 }}>{selectedModel()!.label}</h3>
+            <p>
+              <strong>Support:</strong> {(selectedModel()!.support * 100).toFixed(2)} %
+            </p>
+            <p>
+              <strong>In HPD:</strong>{" "}
+              {selectedModel()!.inHPD === undefined
+                ? "Unknown"
+                : selectedModel()!.inHPD
+                ? "Yes"
+                : "No"}
+            </p>
+            <p>
+              <strong>Connected Models:</strong>
+            </p>
+            <ul style={{ paddingLeft: "1.2rem", margin: 0 }}>
+              {selectedModel()!.neighbors.map(id => (
+                <li>{id}</li>
+              ))}
+            </ul>
+          </div>
+        </Show>
+      </div>
     </div>
-  </div>
-);
+  );
 }

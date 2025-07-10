@@ -41,7 +41,22 @@ export default function App() {
       </header>
 
       <section class="app-graph-section">
-        <ModelGraph data={graphData()} width={960} height={600} showSidebar={true} />
+        <ModelGraph
+          data={graphData()}
+          width={960}
+          height={600}
+          showSidebar={true}
+          minSupport={0.02}
+          colors={{
+            inHPD: "#006400",        // dark green
+            notInHPD: "#8B0000",     // dark red
+            unknown: "#999999",      // gray
+            arrow: "#000000",        // black
+            stroke: "#666666",       // dark gray
+            focusSource: "#ff8888",  // light red
+            focusTarget: "#8888ff"   // light blue
+          }}
+        />
       </section>
     </main>
   );
