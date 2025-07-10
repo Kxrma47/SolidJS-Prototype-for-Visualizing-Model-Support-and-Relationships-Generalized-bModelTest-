@@ -2,67 +2,84 @@
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.92);
+  background-color: #121212;
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  --accent: #4c8fff;
+  --border-radius: 20px;
+  --padding: 2rem;
+  --container-bg: #1f1f1f;
+  --text-muted: #aaa;
+  --text-title: #fff;
+  --graph-bg: #181818;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    color: #1a1a1a;
+    background-color: #f5f5f5;
+    --accent: #2b63d1;
+    --container-bg: #ffffff;
+    --text-muted: #666;
+    --text-title: #000;
+    --graph-bg: #f0f0f0;
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--background-color);
+  color: var(--text-title);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.app-root {
+  max-width: 1200px;
+  width: 95%;
+  margin: 0 auto;
+  padding: var(--padding);
+  background-color: var(--container-bg);
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.app-title {
+  font-size: 2.6rem;
+  margin: 0;
+  color: var(--text-title);
+}
+
+.app-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+.app-graph-section {
+  background-color: var(--graph-bg);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  overflow: auto;
+}
+
+svg {
+  border-radius: var(--border-radius);
+  width: 100%;
+  height: auto;
+  max-height: 700px;
 }
