@@ -185,56 +185,46 @@ export default function ModelGraph(props: {
     });
   });
 
-  return (
-    <div
+return (
+  <div
+    style={{
+      display: "flex",
+      gap: "24px",
+      alignItems: "stretch",
+      height: props.height ? `${H}px` : "100%",
+      backgroundColor: "var(--graph-bg)",
+      borderRadius: "var(--border-radius)",
+      padding: "16px",
+      boxSizing: "border-box",
+      overflow: "hidden",
+    }}
+  >
+    <svg
+      ref={svgRef}
       style={{
-        display: "flex",
-        gap: "24px",
-        alignItems: "stretch",
+        flex: 1,
+        width: props.width ? `${W}px` : "100%",
         height: props.height ? `${H}px` : "100%",
-        backgroundColor: "var(--graph-bg)",
         borderRadius: "var(--border-radius)",
-        padding: "16px",
-        boxSizing: "border-box",
       }}
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="xMidYMid meet"
+    />
+    <div
+      class={`sidebar-panel ${selectedModel() ? "show" : ""}`}
     >
-      <svg
-        ref={svgRef}
-        style={{
-          flex: 1,
-          width: props.width ? `${W}px` : "100%",
-          height: props.height ? `${H}px` : "100%",
-          borderRadius: "var(--border-radius)",
-        }}
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="xMidYMid meet"
-      />
-      {showPanel && (
-        <Show when={selectedModel()}>
-          <div
-            style={{
-              width: "280px",
-              fontSize: "0.95rem",
-              lineHeight: 1.6,
-              padding: "16px",
-              border: "1px solid var(--text-muted)",
-              backgroundColor: "var(--container-bg)",
-              color: "var(--text-title)",
-              overflowY: "auto",
-              borderRadius: "var(--border-radius)",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-            }}
-          >
-            <h3 style={{ marginTop: 0 }}>{selectedModel().label}</h3>
-            <p><strong>Support:</strong> {(selectedModel().support * 100).toFixed(2)} %</p>
-            <p><strong>In HPD:</strong> {selectedModel().inHPD ? "Yes" : "No"}</p>
-            <p><strong>Connected Models:</strong></p>
-            <ul style={{ paddingLeft: "1.2rem", margin: 0 }}>
-              {selectedModel().neighbors.map((id: string) => <li>{id}</li>)}
-            </ul>
-          </div>
-        </Show>
-      )}
+      <Show when={selectedModel()}>
+        <div>
+          <h3 style={{ marginTop: 0 }}>{selectedModel().label}</h3>
+          <p><strong>Support:</strong> {(selectedModel().support * 100).toFixed(2)} %</p>
+          <p><strong>In HPD:</strong> {selectedModel().inHPD ? "Yes" : "No"}</p>
+          <p><strong>Connected Models:</strong></p>
+          <ul style={{ paddingLeft: "1.2rem", margin: 0 }}>
+            {selectedModel().neighbors.map((id: string) => <li>{id}</li>)}
+          </ul>
+        </div>
+      </Show>
     </div>
-  );
+  </div>
+);
 }
