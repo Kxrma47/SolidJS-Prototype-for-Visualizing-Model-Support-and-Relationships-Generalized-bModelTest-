@@ -1,141 +1,164 @@
 
-
 # bModel Visualizer
 
-**Bayesian Substitution Model Support Graph** — an interactive SolidJS + D3 component for visualizing posterior model support and relationships between DNA substitution models (e.g., from bModelTest, BEAST2, or MrBayes).
+**Bayesian Substitution Model Support Graph** — an interactive SolidJS + D3 visualization tool for exploring posterior model support and structural relationships among DNA substitution models (e.g., from bModelTest, BEAST2, or MrBayes).
 
-This tool improves traditional static graphs by offering a responsive layout, zoomable interface, and clarity in support values and hierarchical model transitions.
-
----
-
-## Features
-
-* **Aspect-Ratio-Aware Layout**: Automatically adapts to container dimensions.
-* **Interactive Zoom & Pan**: Freely explore dense graphs.
-* **Posterior Support Encoding**: Node size, color, and tooltips reflect posterior support.
-* **Model Focus + Neighborhood**: Click a node to highlight its links and connections.
-* **Collision-Aware Force Layout**: Prevents label overlap in dense graphs.
-* **Reset & Toggle**: Click again to deselect, or double-click to reset view.
-* **Legend + HPD Indicator**: Color-coded support categories, with 95% HPD inclusion.
-* **Sidebar Panel**: Shows metadata and links for the selected model.
-* **Dark & Light Theme**: Respects system preferences or manual toggle.
+This component improves upon static diagrams by offering intelligent layout, interactivity, and full support interpretation.
 
 ---
 
-## Usage Example
+## 🔍 Key Features
+
+* **Responsive Layout**: Adapts to container width, height, and aspect ratio.
+* **Zoom & Pan**: Mouse/touch-based zooming and panning using `d3.zoom()`.
+* **Force-Directed Graph**:
+
+  * Links and collisions managed via `d3.forceSimulation`.
+  * Horizontal layout can optionally "pin" nodes using `pinX` prop.
+* **Layered Vertical Levels**:
+
+  * Automatic topological sorting from DAG structure.
+  * Each node placed on a vertical level (layer) based on graph depth.
+* **Node Size = Posterior Support**:
+
+  * Radius scales with support values: `r = max(200 * support, 4)`.
+* **Color Encoding**:
+
+  * Green: `inHPD = true`
+  * Red: `inHPD = false`
+  * Gray: `inHPD = undefined`
+* **Smart Label Placement**:
+
+  * Automatically avoids overlap using average vector away from neighbors.
+  * Responsive font size based on zoom scale.
+* **Interactive Tooltips**:
+
+  * Mouse hover reveals label and posterior support.
+* **Focus Mode**:
+
+  * Click a node to highlight all its direct links and neighbors.
+  * Sidebar shows metadata (support, HPD status, neighbors).
+* **Reset View**:
+
+  * Double-click on background or reclick selected node.
+* **Drag & Lock**:
+
+  * Drag any node to a fixed position. Reposition freely.
+* **Legend**:
+
+  * Color-coded box in top-left corner for HPD interpretation.
+* **Dark/Light Theme**:
+
+  * Controlled via global CSS variables or manual toggle.
+* **Configurable Props**:
+
+  * `pinX`: boolean to control whether nodes are grouped horizontally.
+  * `colors`: full theme customization for nodes, links, arrowheads, and focus.
+
+---
+
+## 🛠️ Example Usage
 
 ```tsx
-import { createSignal } from "solid-js";
-import ModelGraph from "./ModelGraph";
-import { exampleData } from "./data/exampleModels";
+<ModelGraph
+  data={graphData}
+  width={960}
+  height={600}
+  aspect={2}
+  showSidebar={true}
+  pinX={true}
+  colors={{
+    inHPD: "#009966",
+    notInHPD: "#CC3333",
+    unknown: "#999999",
+    arrow: "#333",
+    stroke: "#AAA",
+    focusSource: "#cc0000",
+    focusTarget: "#0000cc",
+  }}
+/>
+```
 
-export default function App() {
-  const [graphData] = createSignal(exampleData);
+---
 
-  return (
-    <main>
-      <h1>Bayesian Model Structure Graph</h1>
-      <ModelGraph
-        data={graphData()}
-        width={960}
-        height={600}
-        showSidebar={true}
-        aspect={2}
-      />
-    </main>
-  );
+## ⚙️ Input Format
+
+```ts
+interface Model {
+  id: string;            // Unique identifier
+  label: string;         // Display name
+  support: number;       // Posterior probability (0–1)
+  inHPD?: boolean | null // Optional: 95% HPD inclusion
+}
+
+interface Link {
+  source: string; // ID of parent model
+  target: string; // ID of child model
 }
 ```
 
 ---
 
-## Project Structure
+## 📁 File Structure Summary
 
 ```
 src/
-├── App.tsx              # Main entry point, handles theme and layout
-├── ModelGraph.tsx       # Core visualization component using D3
-├── data/
-│   └── exampleModels.ts # Mock dataset defining models and links
-├── assets/
-│   └── solid.svg        # App logo
-├── index.css            # Global theme and layout styling
-├── App.css              # Page-level and component-specific styles
-├── index.tsx            # App bootstrapping for SolidJS
-└── vite-env.d.ts        # Type definitions for Vite environment
+├── App.tsx               # Main entry with theme toggle and container
+├── ModelGraph.tsx        # Full D3-based visualization logic
+├── data/exampleModels.ts # Sample model/link dataset
+├── App.css, index.css    # Styling for layout and themes
+└── index.tsx             # SolidJS entrypoint
 ```
 
 ---
 
-## JSON Data Format
+## ✅ Improvements over Existing Tools
 
-The component accepts data in this format:
-
-```json
-{
-  "models": [
-    { "id": "121131", "support": 0.28, "inHPD": true, "label": "TN93" },
-    { "id": "123456", "support": 0.09, "inHPD": false, "label": "GTR" }
-  ],
-  "links": [
-    { "source": "121131", "target": "123456" }
-  ]
-}
-```
-
-**Model fields:**
-
-* `support`: Float (0–1), posterior probability.
-* `inHPD`: Boolean, whether part of the 95% HPD set.
-* `label`: Human-readable model name.
-* `links`: Show parent–child model transitions.
+| Feature              | Existing Tools | This Component |
+| -------------------- | -------------- | -------------- |
+| Static layout        | ✅              | ✅              |
+| Zoom & Pan           | ❌              | ✅              |
+| Posterior-based size | ❌              | ✅              |
+| Sidebar metadata     | ❌              | ✅              |
+| Tooltip + Focus view | ❌              | ✅              |
+| Label spacing logic  | ❌              | ✅              |
+| Clustering heuristic | ❌              | ✅ (via `pinX`) |
+| Themeable            | ❌              | ✅              |
+| Dragging nodes       | ❌              | ✅              |
 
 ---
 
-## Design Principles
+## 🧪 Intern Development Log
 
-| Goal            | Description                                       |
-| --------------- | ------------------------------------------------- |
-| Readable Layout | Scales to 100+ models with non-overlapping labels |
-| Input Agnostic  | Works with arbitrary model IDs                    |
-| Customizable    | Fully themeable and embeddable                    |
-| Interactive     | Zoom, pan, focus, metadata sidebar                |
-| Lightweight     | Uses SolidJS + D3 with minimal dependencies       |
+### Phase 1 – Domain Research (July 1–2)
 
----
+* Surveyed model selection tools: bModelTest, BEAST2, MrBayes.
+* Identified need for interactive visualization of posterior support.
+* Designed input JSON schema and layout logic.
 
-## Intern Project Timeline
+### Phase 2 – Functional MVP (July 3–7)
 
-### Phase 1: Domain Analysis (July 1–2)
+* Implemented SolidJS component with D3 logic.
+* Features: zoom, drag, layout, labels, node coloring.
 
-* Reviewed bModelTest, BEAST2, and MrBayes.
-* Identified key flaws: static layout, no zoom, no metadata.
-* Drafted extensible JSON format for graphs.
+### Phase 3 – Visual & Usability Polish (July 8–13)
 
-### Phase 2: Component Development (July 3–7)
+* Added:
 
-* Built `ModelGraph.tsx` using SolidJS and embedded D3.
-* Implemented:
-
-  * Zoom, pan, tooltip, and force layout
-  * Radius and color based on support
-  * Sidebar with metadata
-  * Label scaling and node focus
-
-### Phase 3: Refinement & Appearance (July 8–10)
-
-* Added dynamic styling:
-
-  * Legend and clustering tweaks
-  * Dark/light mode with CSS variables
-  * Animated sidebar, styled container
-  * Improved tooltip and zoom behavior
+  * Sidebar
+  * Arrow markers
+  * Topological sorting for vertical layering
+  * `pinX` boolean clustering
+  * Theme system (color props, dark mode)
+  * Force tuning and label avoidance
+  * Tooltip enhancements and view reset
 
 ---
 ## Screenshots
-![Screenshot 2025-07-10 at 9 45 58 AM](https://github.com/user-attachments/assets/1b254175-98d5-4f0c-9d2a-a22feac81332)
-![Screenshot 2025-07-10 at 9 46 08 AM](https://github.com/user-attachments/assets/27d3bf30-bd1d-480b-ae98-327404b458b9)
-![Screenshot 2025-07-10 at 9 46 43 AM](https://github.com/user-attachments/assets/2885de35-8269-4503-b83b-152b70ad3c3e)
+<img width="1209" height="874" alt="Screenshot 2025-07-13 at 12 53 02 PM" src="https://github.com/user-attachments/assets/8eadacaf-cf9f-40c7-8836-d62ee1ddb305" />
+<img width="1114" height="825" alt="Screenshot 2025-07-13 at 12 53 24 PM" src="https://github.com/user-attachments/assets/80922cb1-cd90-48fb-a791-870fed25e1e7" />
+<img width="1118" height="820" alt="Screenshot 2025-07-13 at 12 53 40 PM" src="https://github.com/user-attachments/assets/e784aa85-d144-4026-bfa8-5e6597be4d19" />
+<img width="1160" height="862" alt="Screenshot 2025-07-13 at 12 54 06 PM" src="https://github.com/user-attachments/assets/9381aaa6-99ff-405e-9c95-df70d532eedb" />
 
 
 ## Technical Stack
