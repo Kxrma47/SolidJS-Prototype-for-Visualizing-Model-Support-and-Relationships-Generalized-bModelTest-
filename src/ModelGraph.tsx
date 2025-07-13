@@ -32,6 +32,7 @@ export default function ModelGraph(props: {
   height?: number;
   aspect?: number;
   showSidebar?: boolean;
+  pinX?: boolean;
   colors?: {
     inHPD?: string;
     notInHPD?: string;
@@ -57,6 +58,7 @@ export default function ModelGraph(props: {
     focusSource: props.colors?.focusSource ?? "#ff4444", // Red focus
     focusTarget: props.colors?.focusTarget ?? "#4444ff"  // Blue focus
   };
+
 
   const g = (id: string) => new Set(id).size;
 
@@ -118,11 +120,30 @@ export default function ModelGraph(props: {
         r,
         labelRadius: Math.max(r, labelW / 2),
         generality: g(m.id),
-        y: H * (0.1 + 0.8 * (g(m.id) - 1) / 5),
       };
     });
 
     const links: SimLink[] = props.data.links.map(l => ({ ...l }));
+
+
+    const indeg = new Map<string, number>();
+    nodes.forEach(n => indeg.set(n.id, 0));
+    links.forEach(l => indeg.set(l.target, (indeg.get(l.target) || 0) + 1));
+    const queue: NodeDatum[] = nodes.filter(n => indeg.get(n.id) === 0);
+    const levels = new Map<string, number>();
+    queue.forEach(n => levels.set(n.id, 0));
+    while (queue.length) {
+      const n = queue.shift()!;
+      const lvl = levels.get(n.id)!;
+      links.filter(l => l.source === n.id).forEach(l => {
+        const tgt = nodes.find(x => x.id === l.target)!;
+        if (!levels.has(tgt.id) || levels.get(tgt.id)! < lvl + 1) levels.set(tgt.id, lvl + 1);
+        indeg.set(tgt.id, indeg.get(tgt.id)! - 1);
+        if (indeg.get(tgt.id) === 0) queue.push(tgt);
+      });
+    }
+    const maxLevel = Math.max(...Array.from(levels.values()));
+    const layerH = (H - 40) / (maxLevel || 1);
 
     const sim = d3
       .forceSimulation<NodeDatum>(nodes)
@@ -135,8 +156,25 @@ export default function ModelGraph(props: {
       )
       .force("charge", d3.forceManyBody<NodeDatum>().strength(-250))
       .force("collision", d3.forceCollide<NodeDatum>().radius(d => d.labelRadius + 20))
-      .force("x", d3.forceX<NodeDatum>().strength(0.25).x(d => (d.id.startsWith("121") ? W / 3 : d.id.startsWith("123") ? (2 * W) / 3 : W / 2)))
-      .force("y", d3.forceY<NodeDatum>().strength(1).y(d => H * (0.1 + 0.8 * (d.generality - 1) / 5)));
+      .force(
+        "x",
+        d3
+          .forceX<NodeDatum>()
+          .strength(0.25)
+          .x(d =>
+            props.pinX
+              ? W / 2
+              : d.id.startsWith("121")
+              ? W / 3
+              : d.id.startsWith("123")
+              ? (2 * W) / 3
+              : W / 2
+          )
+      )
+      .force("y", d3.forceY<NodeDatum>().strength(1).y(d => {
+        const ly = levels.get(d.id) || 0;
+        return 20 + ly * layerH;
+      }));
 
     const link = container
       .append("g")
@@ -277,7 +315,14 @@ const legendData = [
           return t.y! - (dy * (t.r + 4)) / dist;
         });
 
-      node.attr("cx", d => d.x!).attr("cy", d => d.y!);
+      node
+        .attr("cx", d => d.x!)
+        .attr("cy", d => {
+          const ly = levels.get(d.id) || 0;
+          const fy = 20 + ly * layerH;
+          d.y = fy;
+          return fy;
+        });
 
       label
         .attr("x", d => {
@@ -298,24 +343,7 @@ const legendData = [
           const offset = d.r + 18;
           return d.x! + (dx / norm) * offset;
         })
-        .attr("y", d => {
-          const related = links.filter(l => l.source === d || l.target === d);
-          const avg = related.reduce(
-            (acc, l) => {
-              const other = l.source === d ? (l.target as NodeDatum) : (l.source as NodeDatum);
-              acc.dx += d.x! - other.x!;
-              acc.dy += d.y! - other.y!;
-              return acc;
-            },
-            { dx: 0, dy: 0 },
-          );
-          const count = related.length || 1;
-          const dx = avg.dx / count;
-          const dy = avg.dy / count;
-          const norm = Math.sqrt(dx * dx + dy * dy) || 1;
-          const offset = d.r + 18;
-          return d.y! + (dy / norm) * offset;
-        })
+        .attr("y", d => d.y - d.r - 6)
         .style("font-size", () => `${Math.min(12 / d3.zoomTransform(svg.node()!).k, 14)}px`);
     });
 
